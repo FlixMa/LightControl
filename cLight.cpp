@@ -51,8 +51,8 @@ bool cLight::isPoweredOn() {
 
 void cLight::evaluate() {
 
-    // DEBUG_PRINTLN("\n###############");
-    // DEBUG_PRINTLN("#    START    #\n");
+    DEBUG_PRINTLN("\n###############");
+    DEBUG_PRINTLN("#    START    #\n");
 
     // 1. Look at the current dimming state
 
@@ -60,16 +60,14 @@ void cLight::evaluate() {
     unsigned long currentTime = millis();
     unsigned long timeDelta = currentTime - this->lastStateChange;
 
-    // DEBUG_PRINT("timeDelta: "); DEBUG_PRINTLN(timeDelta);
+    DEBUG_PRINT("timeDelta: "); DEBUG_PRINTLN(timeDelta);
 
     unsigned long timeRisingFalling = timeDelta;
 
-//    DEBUG_PRINT("StateBefore: "); DEBUG_PRINTLN(this->dimmingState);
+   DEBUG_PRINT("StateBefore: "); DEBUG_PRINTLN(this->dimmingState);
 
     // 1.2. Has a current state expired?
     switch (this->dimmingState) {
-        case POWERED_OFF: break;
-        case WAITING_FOR_COMMAND: break;
         case WAITING_FOR_DIM_TO_START:{
             if (timeDelta >= TIME_WAITING_FOR_START) {
                 // We're already RISING / FALLING
@@ -148,10 +146,10 @@ void cLight::evaluate() {
         }
         break;
 
-        //default: break;
+        default: break;
     }
 
-//    DEBUG_PRINT("StateAfter: "); DEBUG_PRINTLN(this->dimmingState);
+   DEBUG_PRINT("StateAfter: "); DEBUG_PRINTLN(this->dimmingState);
 
     // 1.3. Calculate current brightness
 
@@ -159,7 +157,7 @@ void cLight::evaluate() {
     float deltaFalling = (this->dimmingState == DIM_FALLING)? (float) timeRisingFalling / TIME_DIM_FALLING  : 0.0f;
 
     this->approximateBrightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
-/*
+
     DEBUG_PRINT("brightness = "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
 
     DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
@@ -171,8 +169,6 @@ void cLight::evaluate() {
     DEBUG_PRINT("           = "); DEBUG_PRINT(this->lastBrightnessWhenIdling); DEBUG_PRINT(" + "); DEBUG_PRINT(deltaRising); DEBUG_PRINT(" - "); DEBUG_PRINTLN(deltaFalling);
 
     DEBUG_PRINT("           = "); DEBUG_PRINTLN(this->approximateBrightness);
-*/
-    //TRANSMITLN(this->approximateBrightness);
 
 
     //NOTE: Handle Control Modes
@@ -181,8 +177,8 @@ void cLight::evaluate() {
 
 
 
-    // DEBUG_PRINTLN("\n#     ENDE    #");
-    // DEBUG_PRINTLN("###############\n");
+    DEBUG_PRINTLN("\n#     ENDE    #");
+    DEBUG_PRINTLN("###############\n");
 }
 
 void cLight::manualControl() {
@@ -305,8 +301,6 @@ void cLight::stopDimming() {
     // Check if dimming isn't alreay halted.
 
     switch (this->dimmingState) {
-        case POWERED_OFF: break;
-        case WAITING_FOR_COMMAND: break;
         case WAITING_FOR_DIM_TO_START:
             // When Button is released to early, the light will turn off.
             turnOff();
@@ -321,7 +315,7 @@ void cLight::stopDimming() {
             this->lastBrightnessWhenIdling = this->approximateBrightness;
             DEBUG_PRINT("stopDimming at "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
         break;
-        //default: break;
+        default: break;
     }
 }
 
@@ -330,6 +324,7 @@ int cLight::readInput() {
 }
 
 void cLight::setOutput(int value) {
-    Serial.println((value) ? "HIGH" : "LOW");
+    DEBUG_PRINT((value) ? "HIGH" : "LOW");
+
     digitalWrite(outputPin, (value) ? HIGH : LOW);
 }
