@@ -30,8 +30,8 @@ class cLight {
 
 public:
 
-    cLight(int outputPin);
-    cLight(int outputPin, int manualTriggerPin);
+    cLight(bool invertsDimDirectionOnStop, int outputPin);
+    cLight(bool invertsDimDirectionOnStop, int outputPin, int manualTriggerPin);
 
     /**
      * Sets the target brightness of this lamp.
@@ -101,6 +101,8 @@ private:
      * should be considered as reached.
      */
     float brightnessEpsilon = 0.01f;
+
+    bool invertsDimDirectionOnStop = false;
 
     /**
      * The brightness of the light at the point in time

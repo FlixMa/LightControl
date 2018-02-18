@@ -10,7 +10,7 @@ void setup() {
     Serial.begin(115200);
     Serial.setTimeout(50);
 
-    light = new cLight(OUT, IN);
+    light = new cLight(false, OUT, IN);
     light->debugMode = false;
 }
 

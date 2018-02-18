@@ -25,7 +25,8 @@
     }\
 }
 
-cLight::cLight(int outputPin, int manualTriggerPin = 0) {
+cLight::cLight(bool invertsDimDirectionOnStop, int outputPin, int manualTriggerPin = 0) {
+    this->invertsDimDirectionOnStop = invertsDimDirectionOnStop;
     this->outputPin = outputPin;
     this->manualTriggerPin = manualTriggerPin;
 
@@ -311,6 +312,10 @@ void cLight::stopDimming() {
 
             setDimmingState(WAITING_FOR_COMMAND);
             setOutput(LOW);
+
+            if (this->invertsDimDirectionOnStop) {
+                this->dimmerWillRise = !this->dimmerWillRise;
+            }
 
             this->lastBrightnessWhenIdling = this->approximateBrightness;
             DEBUG_PRINT("stopDimming at "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
