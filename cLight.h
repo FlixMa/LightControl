@@ -58,22 +58,19 @@ public:
     bool isPoweredOn();
 
     /**
-     * The targeted brightness for this lamp.
-     */
-    float targetBrightness = 0.0f;
-
-    /**
-     * The current brightness roughly approximated.
-     */
-    float approximateBrightness = 0.0f;
-
-    /**
      * Flag, indicating whether the controller is in debug mode.
      * This leads to debug prints via a serial connection.
      *
      * The lower the value, the more verbose it is.
      */
     bool debugMode = false;
+
+
+    void setBrightness(float value);
+    float getBrightness();
+
+    void turnOn();
+    void turnOff();
 
 private:
 
@@ -94,15 +91,11 @@ private:
      */
     bool manualOverwrite = false;
 
-    //MARK: DIMMING
 
     /**
-     * An epsilon value, indicating when the target brightness
-     * should be considered as reached.
+     * The current brightness.
      */
-    float brightnessEpsilon = 0.01f;
-
-    bool invertsDimDirectionOnStop = false;
+    float brightness = 0.0f;
 
     /**
      * The brightness of the light at the point in time
@@ -110,6 +103,10 @@ private:
      */
     float lastBrightnessWhenIdling = 0.0f;
 
+
+    //MARK: DIMMING
+
+    bool invertsDimDirectionOnStop = false;
 
     /**
      * The state, the dimmer is in.
@@ -136,28 +133,11 @@ private:
      */
     void manualControl();
 
-    /**
-     * Controls the light automatically evaluating the targetBrightness property.
-     */
-    void automaticControl();
-
-
-    /**
-     * Sends a short impulse to toggle the light's state.
-     */
-    void toggleLight();
-
-    void turnOn();
-    void turnOff();
-
     void startDimming();
     void stopDimming();
 
-
     int readInput();
-    void setOutput(int value);
-
-
+    void applyBrightness();
 };
 
 #endif

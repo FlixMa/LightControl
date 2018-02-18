@@ -12,6 +12,8 @@ void setup() {
 
     light = new cLight(false, OUT, IN);
     light->debugMode = false;
+
+    light->turnOn();
 }
 
 float brightness = 0.0f;
@@ -31,7 +33,7 @@ void loop() {
 
 
         // Set value as target
-        light->setTargetBrightness(brightness);
+        light->setBrightness(brightness);
     }
 
 
@@ -40,10 +42,9 @@ void loop() {
 
     // 3. print current brightness
     if (Serial && millis() - lastLogged > 100) {
-        String target = String(light->targetBrightness);
-        String approx = String(light->approximateBrightness);
+        String brightness = String(light->getBrightness());
         String turnedOn = String(light->getDimmingState());
-        Serial.println("Brightness: " + approx + " -> " + target + " | on: " + turnedOn);
+        Serial.println("Brightness: " + brightness + " | on: " + turnedOn);
         lastLogged = millis();
     }
 }

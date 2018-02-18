@@ -38,10 +38,6 @@ cLight::cLight(bool invertsDimDirectionOnStop, int outputPin, int manualTriggerP
 
 }
 
-void cLight::setTargetBrightness(float target) {
-    this->targetBrightness = target;
-}
-
 enum DimmingState cLight::getDimmingState() {
     return this->dimmingState;
 }
@@ -55,128 +51,129 @@ void cLight::evaluate() {
     DEBUG_PRINTLN("\n###############");
     DEBUG_PRINTLN("#    START    #\n");
 
-    // 1. Look at the current dimming state
+    if (this->dimmingState != WAITING_FOR_COMMAND) {
 
-    // 1.1. How much time has passed?
-    unsigned long currentTime = millis();
-    unsigned long timeDelta = currentTime - this->lastStateChange;
 
-    DEBUG_PRINT("timeDelta: "); DEBUG_PRINTLN(timeDelta);
+        // 1. Look at the current dimming state
 
-    unsigned long timeRisingFalling = timeDelta;
+        // 1.1. How much time has passed?
+        unsigned long currentTime = millis();
+        unsigned long timeDelta = currentTime - this->lastStateChange;
 
-   DEBUG_PRINT("StateBefore: "); DEBUG_PRINTLN(this->dimmingState);
+        DEBUG_PRINT("timeDelta: "); DEBUG_PRINTLN(timeDelta);
 
-    // 1.2. Has a current state expired?
-    switch (this->dimmingState) {
-        case WAITING_FOR_DIM_TO_START:{
-            if (timeDelta >= TIME_WAITING_FOR_START) {
-                // We're already RISING / FALLING
-                // -> Enter next state.
-                unsigned long timeOverdue = timeDelta - TIME_WAITING_FOR_START;
+        unsigned long timeRisingFalling = timeDelta;
 
-                setDimmingState(
-                    (this->dimmerWillRise) ? DIM_RISING : DIM_FALLING,
-                    currentTime - timeOverdue
-                );
-                timeRisingFalling = timeOverdue;
+        DEBUG_PRINT("StateBefore: "); DEBUG_PRINTLN(this->dimmingState);
+
+        // 1.2. Has a current state expired?
+        switch (this->dimmingState) {
+            case WAITING_FOR_DIM_TO_START:{
+                if (timeDelta >= TIME_WAITING_FOR_START) {
+                    // We're already RISING / FALLING
+                    // -> Enter next state.
+                    unsigned long timeOverdue = timeDelta - TIME_WAITING_FOR_START;
+
+                    setDimmingState(
+                        (this->dimmerWillRise) ? DIM_RISING : DIM_FALLING,
+                        currentTime - timeOverdue
+                    );
+                    timeRisingFalling = timeOverdue;
+                }
             }
-        }
-        break;
-        case DIM_RISING:{
-            unsigned int timeToPeak = (1.0f - this->lastBrightnessWhenIdling) * TIME_DIM_RISING;
-            if (timeDelta >= timeToPeak) {
-                // We've reached the peak
-                // -> Enter next state.
-                unsigned long timeOverdue = timeDelta - timeToPeak;
+            break;
+            case DIM_RISING:{
+                unsigned int timeToPeak = (1.0f - this->lastBrightnessWhenIdling) * TIME_DIM_RISING;
+                if (timeDelta >= timeToPeak) {
+                    // We've reached the peak
+                    // -> Enter next state.
+                    unsigned long timeOverdue = timeDelta - timeToPeak;
 
-                this->dimmerWillRise = false;
-                setDimmingState(
-                    WAITING_AT_PEAK,
-                    currentTime - timeOverdue
-                );
-                this->lastBrightnessWhenIdling = 1.0f;
+                    this->dimmerWillRise = false;
+                    setDimmingState(
+                        WAITING_AT_PEAK,
+                        currentTime - timeOverdue
+                    );
+                    this->lastBrightnessWhenIdling = 1.0f;
+                }
             }
-        }
-        break;
-        case WAITING_AT_PEAK:{
-            if (timeDelta >= TIME_WAITING_AT_PEAK) {
-                // We're already FALLING
-                // -> Enter next state.
-                unsigned long timeOverdue = timeDelta - TIME_WAITING_AT_PEAK;
+            break;
+            case WAITING_AT_PEAK:{
+                if (timeDelta >= TIME_WAITING_AT_PEAK) {
+                    // We're already FALLING
+                    // -> Enter next state.
+                    unsigned long timeOverdue = timeDelta - TIME_WAITING_AT_PEAK;
 
-                this->dimmerWillRise = false;
-                setDimmingState(
-                    DIM_FALLING,
-                    currentTime - timeOverdue
-                );
-                timeRisingFalling = timeOverdue;
+                    this->dimmerWillRise = false;
+                    setDimmingState(
+                        DIM_FALLING,
+                        currentTime - timeOverdue
+                    );
+                    timeRisingFalling = timeOverdue;
+                }
             }
-        }
-        break;
-        case DIM_FALLING:{
-            unsigned int timeToLow = this->lastBrightnessWhenIdling * TIME_DIM_FALLING;
-            if (timeDelta >= timeToLow) {
-                // We've reached the low
-                // -> Enter next state.
-                unsigned long timeOverdue = timeDelta - timeToLow;
+            break;
+            case DIM_FALLING:{
+                unsigned int timeToLow = this->lastBrightnessWhenIdling * TIME_DIM_FALLING;
+                if (timeDelta >= timeToLow) {
+                    // We've reached the low
+                    // -> Enter next state.
+                    unsigned long timeOverdue = timeDelta - timeToLow;
 
-                this->dimmerWillRise = true;
-                setDimmingState(
-                    WAITING_AT_LOW,
-                    currentTime - timeOverdue
-                );
+                    this->dimmerWillRise = true;
+                    setDimmingState(
+                        WAITING_AT_LOW,
+                        currentTime - timeOverdue
+                    );
 
-                this->lastBrightnessWhenIdling = 0.0f;
+                    this->lastBrightnessWhenIdling = 0.0f;
+                }
             }
-        }
-        break;
-        case WAITING_AT_LOW:{
-            if (timeDelta >= TIME_WAITING_AT_LOW) {
-                // We're already RISING
-                // -> Enter next state.
-                unsigned long timeOverdue = timeDelta - TIME_WAITING_AT_LOW;
+            break;
+            case WAITING_AT_LOW:{
+                if (timeDelta >= TIME_WAITING_AT_LOW) {
+                    // We're already RISING
+                    // -> Enter next state.
+                    unsigned long timeOverdue = timeDelta - TIME_WAITING_AT_LOW;
 
-                this->dimmerWillRise = true;
-                setDimmingState(
-                    DIM_RISING,
-                    currentTime - timeOverdue
-                );
-                timeRisingFalling = timeOverdue;
+                    this->dimmerWillRise = true;
+                    setDimmingState(
+                        DIM_RISING,
+                        currentTime - timeOverdue
+                    );
+                    timeRisingFalling = timeOverdue;
+                }
             }
-        }
-        break;
+            break;
 
-        default: break;
+            default: break;
+        }
+
+       DEBUG_PRINT("StateAfter: "); DEBUG_PRINTLN(this->dimmingState);
+
+        // 1.3. Calculate current brightness
+
+        float deltaRising = (this->dimmingState == DIM_RISING)  ? (float) timeRisingFalling / TIME_DIM_RISING   : 0.0f;
+        float deltaFalling = (this->dimmingState == DIM_FALLING)? (float) timeRisingFalling / TIME_DIM_FALLING  : 0.0f;
+
+        this->brightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
+
+        DEBUG_PRINT("brightness = "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
+
+        DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
+
+        DEBUG_PRINT("             - "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_FALLING); DEBUG_PRINT(" ? "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_FALLING); DEBUG_PRINTLN(" : 0");
+
+        DEBUG_PRINTLN("");
+
+        DEBUG_PRINT("           = "); DEBUG_PRINT(this->lastBrightnessWhenIdling); DEBUG_PRINT(" + "); DEBUG_PRINT(deltaRising); DEBUG_PRINT(" - "); DEBUG_PRINTLN(deltaFalling);
+
+        DEBUG_PRINT("           = "); DEBUG_PRINTLN(this->brightness);
+
     }
 
-   DEBUG_PRINT("StateAfter: "); DEBUG_PRINTLN(this->dimmingState);
-
-    // 1.3. Calculate current brightness
-
-    float deltaRising = (this->dimmingState == DIM_RISING)  ? (float) timeRisingFalling / TIME_DIM_RISING   : 0.0f;
-    float deltaFalling = (this->dimmingState == DIM_FALLING)? (float) timeRisingFalling / TIME_DIM_FALLING  : 0.0f;
-
-    this->approximateBrightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
-
-    DEBUG_PRINT("brightness = "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
-
-    DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
-
-    DEBUG_PRINT("             - "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_FALLING); DEBUG_PRINT(" ? "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_FALLING); DEBUG_PRINTLN(" : 0");
-
-    DEBUG_PRINTLN("");
-
-    DEBUG_PRINT("           = "); DEBUG_PRINT(this->lastBrightnessWhenIdling); DEBUG_PRINT(" + "); DEBUG_PRINT(deltaRising); DEBUG_PRINT(" - "); DEBUG_PRINTLN(deltaFalling);
-
-    DEBUG_PRINT("           = "); DEBUG_PRINTLN(this->approximateBrightness);
-
-
-    //NOTE: Handle Control Modes
-    this->manualControl();
-    this->automaticControl();
-
-
+    manualControl();
+    applyBrightness();
 
     DEBUG_PRINTLN("\n#     ENDE    #");
     DEBUG_PRINTLN("###############\n");
@@ -214,7 +211,6 @@ void cLight::manualControl() {
 
             default:
                 stopDimming();
-                this->targetBrightness = this->approximateBrightness;
             break;
         }
     }
@@ -222,49 +218,29 @@ void cLight::manualControl() {
     this->manualOverwrite = newManualOverwrite;
 }
 
-void cLight::automaticControl() {
-    // Only control automatically if button is not pressed.
-    if (!this->manualOverwrite) {
-        DEBUG_PRINT("Automatic Mode: "); DEBUG_PRINTLN(this->dimmingState);
-
-        // Check if we need to take action
-        if (fabs(this->targetBrightness - this->approximateBrightness) > this->brightnessEpsilon) {
-            // We need to dim.
-
-            turnOn();
-            startDimming();
-
-        } else {
-            // We're done. Light level has been reached.
-            // -> Stop.
-            stopDimming();
-        }
-    }
-}
-
 void cLight::setDimmingState(enum DimmingState newState, unsigned long timeChanged = 0) {
     this->dimmingState = newState;
     this->lastStateChange = (timeChanged != 0) ? timeChanged : millis();
 
+    if (newState == WAITING_FOR_COMMAND) {
+        this->lastBrightnessWhenIdling = this->brightness;
+    }
+
     DEBUG_PRINT("setDimmingState -> ");
     DEBUG_PRINT(newState); DEBUG_PRINT(" | ");
     DEBUG_PRINTLN(this->lastStateChange);
-
-}
-
-void cLight::toggleLight() {
-    setOutput(LOW);
-    delay(100);
-    setOutput(HIGH);
-    delay(100);
-    setOutput(LOW);
-    delay(100);
 }
 
 void cLight::turnOn() {
     if (!isPoweredOn()) {
         DEBUG_PRINTLN("turnOn");
-        toggleLight();
+
+        // Reapply brightness, which has been active when turned off.
+        this->brightness = (this->brightness > 0.1)
+                            ? this->brightness
+                            : 0.1;
+
+        setBrightness(this->brightness);
         setDimmingState(WAITING_FOR_COMMAND);
     }
 }
@@ -272,15 +248,7 @@ void cLight::turnOn() {
 void cLight::turnOff() {
     if (isPoweredOn()) {
         DEBUG_PRINTLN("turnOff");
-
-        if (this->dimmingState == WAITING_FOR_DIM_TO_START) {
-            // We haven't started to dim yet, but the pin is already high.
-            // -> Pulling it to low will suffice to turn the light off.
-            setOutput(LOW);
-
-        } else {
-            toggleLight();
-        }
+        setBrightness(0.0f);
     }
     setDimmingState(POWERED_OFF);
 }
@@ -291,10 +259,9 @@ void cLight::startDimming() {
     if (this->dimmingState == WAITING_FOR_COMMAND) {
         // It's not. -> Start.
 
-        DEBUG_PRINT("startDimming at "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
+        DEBUG_PRINT("startDimming at "); DEBUG_PRINTLN(this->brightness);
 
         setDimmingState(WAITING_FOR_DIM_TO_START);
-        setOutput(HIGH);
     }
 }
 
@@ -311,25 +278,34 @@ void cLight::stopDimming() {
             // It's not. -> Stop.
 
             setDimmingState(WAITING_FOR_COMMAND);
-            setOutput(LOW);
 
             if (this->invertsDimDirectionOnStop) {
                 this->dimmerWillRise = !this->dimmerWillRise;
             }
 
-            this->lastBrightnessWhenIdling = this->approximateBrightness;
-            DEBUG_PRINT("stopDimming at "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
+            DEBUG_PRINT("stopDimming at "); DEBUG_PRINTLN(this->brightness);
         break;
         default: break;
     }
 }
 
 int cLight::readInput() {
-    return (manualTriggerPin != 0 && !digitalRead(manualTriggerPin)) ? HIGH : LOW;
+    return (this->manualTriggerPin != 0 && !digitalRead(this->manualTriggerPin)) ? HIGH : LOW;
 }
 
-void cLight::setOutput(int value) {
-    DEBUG_PRINT((value) ? "HIGH" : "LOW");
+void cLight::setBrightness(float value) {
+    DEBUG_PRINT(value);
+    this->brightness = value;
+    if (this->dimmingState == WAITING_FOR_COMMAND) {
+        this->lastBrightnessWhenIdling = this->brightness;
+    }
+}
 
-    digitalWrite(outputPin, (value) ? HIGH : LOW);
+float cLight::getBrightness() {
+    return isPoweredOn() ? this->brightness : 0.0f;
+}
+
+void cLight::applyBrightness() {
+    float target = map(getBrightness(), 0.0f, 1.0f, 0, 255);
+    analogWrite(this->outputPin, target);
 }
