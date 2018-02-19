@@ -48,8 +48,8 @@ bool cLight::isPoweredOn() {
 
 void cLight::evaluate() {
 
-    DEBUG_PRINTLN("\n###############");
-    DEBUG_PRINTLN("#    START    #\n");
+    //DEBUG_PRINTLN("\n###############");
+    //DEBUG_PRINTLN("#    START    #\n");
 
     if (this->dimmingState != WAITING_FOR_COMMAND) {
 
@@ -175,8 +175,8 @@ void cLight::evaluate() {
     manualControl();
     applyBrightness();
 
-    DEBUG_PRINTLN("\n#     ENDE    #");
-    DEBUG_PRINTLN("###############\n");
+    //DEBUG_PRINTLN("\n#     ENDE    #");
+    //DEBUG_PRINTLN("###############\n");
 }
 
 void cLight::manualControl() {
@@ -306,6 +306,6 @@ float cLight::getBrightness() {
 }
 
 void cLight::applyBrightness() {
-    float target = map(getBrightness(), 0.0f, 1.0f, 0, 255);
+    float target = map(getBrightness() * 100, 0, 100, 0, 255);
     analogWrite(this->outputPin, target);
 }
