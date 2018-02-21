@@ -25,7 +25,12 @@
     }\
 }
 
-cLight::cLight(bool invertsDimDirectionOnStop, int outputPin, int manualTriggerPin = 0) {
+cLight::cLight(int identifier, bool invertsDimDirectionOnStop, int outputPin, int manualTriggerPin = 0) {
+    if (identifier == 0) {
+        TRANSMITLN("WARNING: Usage of the broadcast adress (0) as an identifier for a light. This may lead to unexpected behaviour!");
+    }
+
+    this->identifier = identifier;
     this->invertsDimDirectionOnStop = invertsDimDirectionOnStop;
     this->outputPin = outputPin;
     this->manualTriggerPin = manualTriggerPin;
@@ -51,7 +56,7 @@ void cLight::evaluate() {
     //DEBUG_PRINTLN("\n###############");
     //DEBUG_PRINTLN("#    START    #\n");
 
-    if (this->dimmingState != WAITING_FOR_COMMAND) {
+    if (isPoweredOn() && this->dimmingState != WAITING_FOR_COMMAND) {
 
 
         // 1. Look at the current dimming state
@@ -83,7 +88,7 @@ void cLight::evaluate() {
             }
             break;
             case DIM_RISING:{
-                unsigned int timeToPeak = (1.0f - this->lastBrightnessWhenIdling) * TIME_DIM_RISING;
+                unsigned int timeToPeak = ((float) (100 - this->lastBrightnessWhenIdling)) / 100 * TIME_DIM_RISING;
                 if (timeDelta >= timeToPeak) {
                     // We've reached the peak
                     // -> Enter next state.
@@ -94,7 +99,7 @@ void cLight::evaluate() {
                         WAITING_AT_PEAK,
                         currentTime - timeOverdue
                     );
-                    this->lastBrightnessWhenIdling = 1.0f;
+                    this->lastBrightnessWhenIdling = 100;
                 }
             }
             break;
@@ -114,7 +119,7 @@ void cLight::evaluate() {
             }
             break;
             case DIM_FALLING:{
-                unsigned int timeToLow = this->lastBrightnessWhenIdling * TIME_DIM_FALLING;
+                unsigned int timeToLow = ((float) this->lastBrightnessWhenIdling) / 100 * TIME_DIM_FALLING;
                 if (timeDelta >= timeToLow) {
                     // We've reached the low
                     // -> Enter next state.
@@ -126,7 +131,7 @@ void cLight::evaluate() {
                         currentTime - timeOverdue
                     );
 
-                    this->lastBrightnessWhenIdling = 0.0f;
+                    this->lastBrightnessWhenIdling = 0;
                 }
             }
             break;
@@ -153,10 +158,12 @@ void cLight::evaluate() {
 
         // 1.3. Calculate current brightness
 
-        float deltaRising = (this->dimmingState == DIM_RISING)  ? (float) timeRisingFalling / TIME_DIM_RISING   : 0.0f;
-        float deltaFalling = (this->dimmingState == DIM_FALLING)? (float) timeRisingFalling / TIME_DIM_FALLING  : 0.0f;
+        int deltaRising = (this->dimmingState == DIM_RISING)  ? 100 * timeRisingFalling / TIME_DIM_RISING   : 0;
+        int deltaFalling = (this->dimmingState == DIM_FALLING)? 100 * timeRisingFalling / TIME_DIM_FALLING  : 0;
 
-        this->brightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
+        setBrightness(
+            this->lastBrightnessWhenIdling + deltaRising - deltaFalling
+        );
 
         DEBUG_PRINT("brightness = "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
 
@@ -232,25 +239,25 @@ void cLight::setDimmingState(enum DimmingState newState, unsigned long timeChang
 }
 
 void cLight::turnOn() {
+    DEBUG_PRINTLN("turnOn");
     if (!isPoweredOn()) {
-        DEBUG_PRINTLN("turnOn");
+        setDimmingState(WAITING_FOR_COMMAND);
 
         // Reapply brightness, which has been active when turned off.
-        this->brightness = (this->brightness > 0.1)
+        this->brightness = (this->brightness > 10)
                             ? this->brightness
-                            : 0.1;
+                            : 10;
 
         setBrightness(this->brightness);
-        setDimmingState(WAITING_FOR_COMMAND);
     }
 }
 
 void cLight::turnOff() {
+    DEBUG_PRINTLN("turnOff");
     if (isPoweredOn()) {
-        DEBUG_PRINTLN("turnOff");
-        setBrightness(0.0f);
+        setDimmingState(POWERED_OFF);
+        setBrightness(0);
     }
-    setDimmingState(POWERED_OFF);
 }
 
 void cLight::startDimming() {
@@ -293,19 +300,99 @@ int cLight::readInput() {
     return (this->manualTriggerPin != 0 && !digitalRead(this->manualTriggerPin)) ? HIGH : LOW;
 }
 
-void cLight::setBrightness(float value) {
-    DEBUG_PRINT(value);
-    this->brightness = value;
+void cLight::setBrightness(int value) {
+    this->brightness = constrain(value, 0, 100);
     if (this->dimmingState == WAITING_FOR_COMMAND) {
         this->lastBrightnessWhenIdling = this->brightness;
     }
+
+    DEBUG_PRINTLN(this->brightness);
 }
 
-float cLight::getBrightness() {
-    return isPoweredOn() ? this->brightness : 0.0f;
+int cLight::getBrightness() {
+    return isPoweredOn() ? this->brightness : 0;
 }
 
 void cLight::applyBrightness() {
-    float target = map(getBrightness() * 100, 0, 100, 0, 255);
-    analogWrite(this->outputPin, target);
+    int target = getBrightness();
+    if (target != this->lastAppliedBrightness) {
+        // We have to adjust the output.
+
+        float pwm = map(getBrightness(), 0, 100, 0, 255);
+        analogWrite(this->outputPin, pwm);
+        this->lastAppliedBrightness = target;
+
+        // Let's notify the connected peer about the change.
+        notifyPeer();
+    }
+}
+
+
+// JSON Analysis
+
+void cLight::readJSON(char json[]) {
+    StaticJsonBuffer<60>  buffer;
+    JsonObject& root = buffer.parseObject(json);
+
+    if (!root.success()) {
+        TRANSMITLN("IT DOESNT WORK!");
+        return;
+    }
+
+    JsonVariant lightIdentifier = root["identifier"];
+    JsonVariant desiredBrightness = root["brightness"];
+    int desiredPowerState = root["power"];
+
+    if (
+        lightIdentifier.success()
+        && (lightIdentifier.as<int>() == this->identifier
+        || lightIdentifier.as<int>() == 0)
+    ) {
+        DEBUG_PRINT("JSON for light: "); DEBUG_PRINTLN(lightIdentifier.as<int>());
+
+        // set brightness if key is available
+        if (desiredBrightness.success()) {
+            int val = desiredBrightness.as<int>();
+
+            DEBUG_PRINT("JSON brightness: "); DEBUG_PRINTLN(val);
+            if (val > 0) {
+                turnOn();
+                setBrightness(val);
+            } else {
+                turnOff();
+            }
+
+        } else {
+
+            // NOTE: we dont need to check the key here
+            // -> if its not we get a 0 which triggers the default case and therfore does nothing
+            DEBUG_PRINT("JSON power cmd: "); DEBUG_PRINTLN(desiredPowerState);
+            switch (desiredPowerState) {
+            case 1:
+                turnOn();
+                break;
+            case -1:
+                turnOff();
+                break;
+            default:
+                break;
+            }
+
+        }
+    }
+}
+
+void cLight::notifyPeer() {
+    // the message is at most 60 characters long:
+    // {"identifier":1,"brightness":39,"isPoweredOn":true}
+    StaticJsonBuffer<60> buffer;
+
+    JsonObject& root = buffer.createObject();
+
+    root["identifier"] = this->identifier;
+    root["brightness"] = getBrightness();
+    root["isPoweredOn"] = isPoweredOn();
+
+    root.printTo(Serial);
+    Serial.println();
 }

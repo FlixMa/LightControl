@@ -2,6 +2,7 @@
 #define _LIGHT_H_
 
 #include "Arduino.h"
+#include <ArduinoJson.h>
 
 #define TIME_WAITING_FOR_START  (1000)
 #define TIME_DIM_RISING         (4000)
@@ -30,14 +31,19 @@ class cLight {
 
 public:
 
-    cLight(bool invertsDimDirectionOnStop, int outputPin);
-    cLight(bool invertsDimDirectionOnStop, int outputPin, int manualTriggerPin);
+    cLight(int identifier, bool invertsDimDirectionOnStop, int outputPin);
+    cLight(int identifier, bool invertsDimDirectionOnStop, int outputPin, int manualTriggerPin);
 
     /**
-     * Sets the target brightness of this lamp.
-     * @param target brightness in percent.
+     * Sets the brightness of this light.
+     * @param brightness in percent.
      */
-    void setTargetBrightness(float target);
+     void setBrightness(int value);
+    /**
+     * Returns the current brightness.
+     * @return brightness in percent.
+     */
+     int getBrightness();
 
     /**
      * Evaluates the current states and takes the appropriate actions
@@ -65,14 +71,28 @@ public:
      */
     bool debugMode = false;
 
-
-    void setBrightness(float value);
-    float getBrightness();
-
     void turnOn();
     void turnOff();
 
+    /**
+     * Reads the desired State from a JSON string.
+     * It should look like this:
+     *
+     * @param json The string to read. It should be in this format:
+     *      {
+     *          "identifier": 1,
+     *          "brightness": 63,
+     *          "power":-1
+     *      }
+     */
+    void readJSON(char json[]);
+
 private:
+
+    /**
+     * A unique identification of this light.
+     */
+    int identifier;
 
     //MARK: Input / Output
 
@@ -95,14 +115,18 @@ private:
     /**
      * The current brightness.
      */
-    float brightness = 0.0f;
+    int brightness = 0;
 
     /**
      * The brightness of the light at the point in time
      * when the dimmer was idling.
      */
-    float lastBrightnessWhenIdling = 0.0f;
+    int lastBrightnessWhenIdling = 0;
 
+    /**
+     * The last brightness to which the PWM signal has been adjusted to.
+     */
+    int lastAppliedBrightness = -1;
 
     //MARK: DIMMING
 
@@ -138,6 +162,18 @@ private:
 
     int readInput();
     void applyBrightness();
+
+    /**
+     * Writes the current state of the light to the peer connected via Serial.
+     *
+     * A JSON String is sent in the following format:
+     *  {
+     *      "identifier"    : 1,
+     *      "brightness"    : 75,
+     *      "isPoweredOn"   : 1
+     *  }
+     */
+    void notifyPeer();
 };
 
 #endif
