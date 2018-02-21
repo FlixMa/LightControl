@@ -383,16 +383,18 @@ void cLight::readJSON(char json[]) {
 }
 
 void cLight::notifyPeer() {
-    // the message is at most 60 characters long:
-    // {"identifier":1,"brightness":39,"isPoweredOn":true}
-    StaticJsonBuffer<60> buffer;
+    if (Serial.availableForWrite() > 60) {
+        // the message is at most 60 characters long:
+        // {"identifier":1,"brightness":39,"isPoweredOn":true}
+        StaticJsonBuffer<60> buffer;
 
-    JsonObject& root = buffer.createObject();
+        JsonObject& root = buffer.createObject();
 
-    root["identifier"] = this->identifier;
-    root["brightness"] = getBrightness();
-    root["isPoweredOn"] = isPoweredOn();
+        root["identifier"] = this->identifier;
+        root["brightness"] = getBrightness();
+        root["isPoweredOn"] = isPoweredOn();
 
-    root.printTo(Serial);
-    Serial.println();
+        root.printTo(Serial);
+        Serial.println();
+    }
 }
