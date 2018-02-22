@@ -11,12 +11,12 @@ var sock = new net.Socket();
 sock.setEncoding('utf8');
 sock.on("connect", function() {
     // when connection is established
-    console.log("Socket for lights opened.");
+    console.log("2. Socket for lights opened.");
 });
 
 sock.on("data", function (data) {
     // when data is received
-    console.log("Socket for lights received data.");
+    console.log("3. Socket for lights received data.");
 
     try {
     	var command = data;
@@ -30,7 +30,7 @@ sock.on("data", function (data) {
 		    	command = lines[lines.length - 2];
 		    }
 	    }
-	    
+
 	    var state = JSON.parse(command);
 	    console.log("-> ", state);
 
@@ -44,7 +44,7 @@ sock.on("data", function (data) {
 	    }
 
     } catch(err) {
-    	console.log("Error while parsing arduino state:", err);
+    	console.log("3. Error while parsing arduino state:", err);
     }
 
 
@@ -52,22 +52,27 @@ sock.on("data", function (data) {
 
 sock.on("error", function (error) {
 
-    console.log("Socket for lights issued error:", error);
+    console.log("4. Socket for lights issued error:", error);
 
+});
+
+sock.on("timeout", function () {
+    // If we timeout reinitiate the connection.
+    // -> Closing will suffice here as the closing event tries to reconnect.
+    console.log("4. Socket for lights timed out.");
+    sock.close();
 });
 
 sock.on("close", function () {
     // Reinitiate the connection.
-
-    console.log("Socket for lights closed.");
-
-    setTimeout(10000, connect);
-
+    console.log("5. Socket for lights closed.");
+    setTimeout(connect, 1000);
 });
 
 
 function connect() {
-	sock.connect(12345, "192.168.228.238");	
+    console.log("1. Connecting to Server.");
+	sock.connect(12345, "192.168.228.238");
 };
 connect();
 
