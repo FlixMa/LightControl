@@ -1,13 +1,10 @@
 #include <ArduinoJson.h>
 #include "cLight.h"
 
-#define OUT (9)
-#define IN (52)
-
-
 // MARK: Global Variables
 
 cLight* light;
+cLight* fluter;
 
 String command = "";
 bool commandReady = false;
@@ -27,10 +24,12 @@ void setup() {
 
     Serial.println("Arduino is ready!");
 
-    light = new cLight(1, false, OUT, IN);
+    light = new cLight(1, false, 9, 52);
     light->debugMode = false;
 
     light->turnOn();
+
+    fluter = new cLight(2, false, 5, 50);
 }
 
 /**
@@ -51,6 +50,7 @@ void loop() {
 
     // 2. evaluate current status
     light->evaluate();
+    fluter->evaluate();
 }
 
 /**

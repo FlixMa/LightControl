@@ -4,6 +4,8 @@
 #include "Arduino.h"
 #include <ArduinoJson.h>
 
+#define TIME_DEBOUNCE_BUTTON    (100)
+
 #define TIME_WAITING_FOR_START  (1000)
 #define TIME_DIM_RISING         (4000)
 #define TIME_WAITING_AT_PEAK    (200)
@@ -107,10 +109,16 @@ private:
     int manualTriggerPin;
 
     /**
-     * Flag, indicating whether control is being overwritten manually.
+     * Flag, indicating whether the button button was pressed
+     * during last cycle (including the debounce time).
      */
-    bool manualOverwrite = false;
+    bool buttonWasPressed = false;
 
+    /**
+     * The first time the button issued a rising edge.
+     * This is used in conjunction with TIME_DEBOUNCE_BUTTON to debounce button inputs.
+     */
+    unsigned long manuallyTriggeredTime = 0;
 
     /**
      * The current brightness.

@@ -187,24 +187,40 @@ void cLight::evaluate() {
 }
 
 void cLight::manualControl() {
-    int newManualOverwrite = readInput();
+    bool buttonIsPressed = readInput();
 
-    if (!this->manualOverwrite && newManualOverwrite) {
+    // Debounce buttons.
+    bool isDebouncing = (millis() - this->manuallyTriggeredTime) < TIME_DEBOUNCE_BUTTON;
+
+    // wenn steigende flanke und nicht noch am debouncen
+    // -> starte debounce und halte state auf HIGH
+
+    // wenn fallende flanke und nicht noch am debouncen
+    // -> starte debounce und halte state auf low
+
+
+    if (!this->buttonWasPressed && buttonIsPressed && !isDebouncing) {
         DEBUG_PRINT("Manual Mode: ") DEBUG_PRINT(this->dimmingState); DEBUG_PRINTLN(" | Button Pressed.");
         // Rising Edge detected.
         // -> Button pressed.
+
+        // Start debouncing and therefore lock it in this state.
+        this->manuallyTriggeredTime = millis();
+        this->buttonWasPressed = true;
 
         if (this->dimmingState == WAITING_FOR_COMMAND) {
             startDimming();
         }
 
-        //TODO: Can't turn lamp on or off. Needs detection for short impulses!
-        //TODO: Does not work if we're already dimming using auto mode...
 
-    } else if (this->manualOverwrite && !newManualOverwrite) {
+    } else if (this->buttonWasPressed && !buttonIsPressed && !isDebouncing) {
         DEBUG_PRINT("Manual Mode: ") DEBUG_PRINT(this->dimmingState); DEBUG_PRINTLN(" | Button released.");
         // Falling Edge detected.
         // -> Button released.
+
+        // Start debouncing and therefore lock it in this state.
+        this->manuallyTriggeredTime = millis();
+        this->buttonWasPressed = false;
 
         switch (this->dimmingState) {
             case POWERED_OFF:
@@ -220,9 +236,9 @@ void cLight::manualControl() {
                 stopDimming();
             break;
         }
+
     }
 
-    this->manualOverwrite = newManualOverwrite;
 }
 
 void cLight::setDimmingState(enum DimmingState newState, unsigned long timeChanged = 0) {
