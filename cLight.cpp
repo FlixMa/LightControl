@@ -57,7 +57,7 @@ void cLight::evaluate() {
     //DEBUG_PRINTLN("#    START    #\n");
 
     if (isPoweredOn() && this->dimmingState != WAITING_FOR_COMMAND) {
-
+        int brightnessStroke = (this->maximumBrightness - this->minimumBrightness);
 
         // 1. Look at the current dimming state
 
@@ -88,7 +88,7 @@ void cLight::evaluate() {
             }
             break;
             case DIM_RISING:{
-                unsigned int timeToPeak = ((float) (100 - this->lastBrightnessWhenIdling)) / 100 * TIME_DIM_RISING;
+                unsigned int timeToPeak = ((float) (this->maximumBrightness - this->lastBrightnessWhenIdling)) / brightnessStroke * TIME_DIM_RISING;
                 if (timeDelta >= timeToPeak) {
                     // We've reached the peak
                     // -> Enter next state.
@@ -99,7 +99,7 @@ void cLight::evaluate() {
                         WAITING_AT_PEAK,
                         currentTime - timeOverdue
                     );
-                    this->lastBrightnessWhenIdling = 100;
+                    this->lastBrightnessWhenIdling = this->maximumBrightness;
                 }
             }
             break;
@@ -119,7 +119,7 @@ void cLight::evaluate() {
             }
             break;
             case DIM_FALLING:{
-                unsigned int timeToLow = ((float) this->lastBrightnessWhenIdling) / 100 * TIME_DIM_FALLING;
+                unsigned int timeToLow = ((float) (this->lastBrightnessWhenIdling - this->minimumBrightness)) / brightnessStroke * TIME_DIM_FALLING;
                 if (timeDelta >= timeToLow) {
                     // We've reached the low
                     // -> Enter next state.
@@ -131,7 +131,7 @@ void cLight::evaluate() {
                         currentTime - timeOverdue
                     );
 
-                    this->lastBrightnessWhenIdling = 0;
+                    this->lastBrightnessWhenIdling = this->minimumBrightness;
                 }
             }
             break;
@@ -158,25 +158,24 @@ void cLight::evaluate() {
 
         // 1.3. Calculate current brightness
 
-        int deltaRising = (this->dimmingState == DIM_RISING)  ? 100 * timeRisingFalling / TIME_DIM_RISING   : 0;
-        int deltaFalling = (this->dimmingState == DIM_FALLING)? 100 * timeRisingFalling / TIME_DIM_FALLING  : 0;
+        int deltaRising = (this->dimmingState == DIM_RISING)  ? brightnessStroke * timeRisingFalling / TIME_DIM_RISING   : 0;
+        int deltaFalling = (this->dimmingState == DIM_FALLING)? brightnessStroke * timeRisingFalling / TIME_DIM_FALLING  : 0;
 
-        setBrightness(
-            this->lastBrightnessWhenIdling + deltaRising - deltaFalling
-        );
+        int calculatedBrightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
 
         DEBUG_PRINT("brightness = "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
 
-        DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
+        DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(brightnessStroke); DEBUG_PRINT(" * "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
 
-        DEBUG_PRINT("             - "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_FALLING); DEBUG_PRINT(" ? "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_FALLING); DEBUG_PRINTLN(" : 0");
+        DEBUG_PRINT("             - "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_FALLING); DEBUG_PRINT(" ? "); DEBUG_PRINT(brightnessStroke); DEBUG_PRINT(" * "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_FALLING); DEBUG_PRINTLN(" : 0");
 
         DEBUG_PRINTLN("");
 
         DEBUG_PRINT("           = "); DEBUG_PRINT(this->lastBrightnessWhenIdling); DEBUG_PRINT(" + "); DEBUG_PRINT(deltaRising); DEBUG_PRINT(" - "); DEBUG_PRINTLN(deltaFalling);
 
-        DEBUG_PRINT("           = "); DEBUG_PRINTLN(this->brightness);
+        DEBUG_PRINT("           = "); DEBUG_PRINTLN(calculatedBrightness);
 
+        setBrightness(calculatedBrightness);
     }
 
     manualControl();
@@ -255,21 +254,24 @@ void cLight::setDimmingState(enum DimmingState newState, unsigned long timeChang
 }
 
 void cLight::turnOn() {
-    DEBUG_PRINTLN("turnOn");
+    DEBUG_PRINTLN("turning light on");
     if (!isPoweredOn()) {
         setDimmingState(WAITING_FOR_COMMAND);
 
-        // Reapply brightness, which has been active when turned off.
-        this->brightness = (this->brightness > 10)
-                            ? this->brightness
-                            : 10;
+        DEBUG_PRINT("lastBrightnessWhenIdling is ") DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
 
-        setBrightness(this->brightness);
+        // Reapply brightness, which has been active when light was turned off.
+        setBrightness(constrain(
+            this->lastBrightnessWhenIdling,
+            max(this->minimumBrightness, 10), min(this->maximumBrightness, 75)
+            //TODO: Maybe remove this min and max
+        ));
+
     }
 }
 
 void cLight::turnOff() {
-    DEBUG_PRINTLN("turnOff");
+    DEBUG_PRINTLN("turning light off");
     if (isPoweredOn()) {
         setDimmingState(POWERED_OFF);
         setBrightness(0);
@@ -318,11 +320,13 @@ int cLight::readInput() {
 
 void cLight::setBrightness(int value) {
     this->brightness = constrain(value, 0, 100);
-    if (this->dimmingState == WAITING_FOR_COMMAND) {
+
+    if (this->dimmingState == WAITING_FOR_COMMAND || (this->dimmingState == POWERED_OFF && this->brightness > 0)) {
+
         this->lastBrightnessWhenIdling = this->brightness;
     }
 
-    DEBUG_PRINTLN(this->brightness);
+    DEBUG_PRINT("set brightness to "); DEBUG_PRINTLN(this->brightness);
 }
 
 int cLight::getBrightness() {
@@ -334,7 +338,8 @@ void cLight::applyBrightness() {
     if (target != this->lastAppliedBrightness) {
         // We have to adjust the output.
 
-        float pwm = map(getBrightness(), 0, 100, 0, 255);
+        // map value to the 8bit pwm duty cycle and write it out
+        int pwm = map(getBrightness(), 0, 100, 0, 255);
         analogWrite(this->outputPin, pwm);
         this->lastAppliedBrightness = target;
 
@@ -343,10 +348,17 @@ void cLight::applyBrightness() {
     }
 }
 
+void cLight::setBrightnessBounds(int minimum, int maximum) {
+    this->minimumBrightness = constrain(minimum, 0, 100);
+    this->maximumBrightness = constrain(maximum, 0, 100);
+}
 
 // JSON Analysis
 
-void cLight::readJSON(char json[]) {
+void cLight::readJSON(String command) {
+    char json[60];
+    command.toCharArray(json, 60);
+
     StaticJsonBuffer<60>  buffer;
     JsonObject& root = buffer.parseObject(json);
 
@@ -372,8 +384,8 @@ void cLight::readJSON(char json[]) {
 
             DEBUG_PRINT("JSON brightness: "); DEBUG_PRINTLN(val);
             if (val > 0) {
-                turnOn();
                 setBrightness(val);
+                turnOn();
             } else {
                 turnOff();
             }

@@ -6,10 +6,10 @@
 
 #define TIME_DEBOUNCE_BUTTON    (100)
 
-#define TIME_WAITING_FOR_START  (1000)
-#define TIME_DIM_RISING         (4000)
+#define TIME_WAITING_FOR_START  (500)
+#define TIME_DIM_RISING         (3000)
 #define TIME_WAITING_AT_PEAK    (200)
-#define TIME_DIM_FALLING        (4000)
+#define TIME_DIM_FALLING        (3000)
 #define TIME_WAITING_AT_LOW     (200)
 
 
@@ -87,7 +87,20 @@ public:
      *          "power":-1
      *      }
      */
-    void readJSON(char json[]);
+    void readJSON(String command);
+
+
+    /**
+     * Sets the boundaries of the brightness value for this light.
+     * The brightness, which is set by the dimmer/serial communication
+     * will then be interpolated in this interval
+     *
+     * i.e. 100% maps to the maximum and 0% brightness maps to the minimum.
+     *
+     * @param minimum the maximum brightness of this light
+     * @param maximum the minimum brightness of this light
+     */
+    void setBrightnessBounds(int minimum, int maximum);
 
 private:
 
@@ -120,6 +133,9 @@ private:
      */
     unsigned long manuallyTriggeredTime = 0;
 
+
+    //MARK: Brightness
+
     /**
      * The current brightness.
      */
@@ -135,6 +151,19 @@ private:
      * The last brightness to which the PWM signal has been adjusted to.
      */
     int lastAppliedBrightness = -1;
+
+
+    /**
+     * The upper bound of brightness for this light. See setBrightnessBounds().
+     */
+    int maximumBrightness = 100;
+
+    /**
+     * The lower bound of brightness for this light. See setBrightnessBounds().
+     */
+    int minimumBrightness = 0;
+
+
 
     //MARK: DIMMING
 

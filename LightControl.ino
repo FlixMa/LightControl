@@ -3,7 +3,7 @@
 
 // MARK: Global Variables
 
-cLight* light;
+cLight* leselampe;
 cLight* fluter;
 
 String command = "";
@@ -24,12 +24,14 @@ void setup() {
 
     Serial.println("Arduino is ready!");
 
-    light = new cLight(1, false, 9, 52);
-    light->debugMode = false;
-
-    light->turnOn();
-
+    leselampe = new cLight(1, false, 9, 52);
+    leselampe->setBrightnessBounds(10, 100);
+    //leselampe->debugMode = true;
+    
     fluter = new cLight(2, false, 5, 50);
+    fluter->setBrightnessBounds(10, 100);
+    fluter->turnOn();
+    fluter->setBrightness(50);
 }
 
 /**
@@ -40,16 +42,15 @@ void loop() {
     // 1. Check, if we have a new command ready to parse
     if (commandReady) {
 
-        char json[60];
-        command.toCharArray(json, 60);
-        light->readJSON(json);
+        leselampe->readJSON(command);
+        fluter->readJSON(command);
 
         command = "";
         commandReady = false;
     }
 
     // 2. evaluate current status
-    light->evaluate();
+    leselampe->evaluate();
     fluter->evaluate();
 }
 
