@@ -72,7 +72,7 @@ sock.on("close", function () {
 
 function connect() {
     console.log("1. Connecting to Server.");
-	sock.connect(12345, "192.168.228.238");
+	sock.connect(12345, "pi3");
 };
 connect();
 
@@ -235,10 +235,11 @@ function fakeLight(displayName, mac, arduinoIdentifier) {
     acc.getService(Service.Lightbulb)
         .getCharacteristic(Characteristic.Brightness)
         .on('set', function (value, callback) {
-            console.log("Setting brightness to " + value + "%.");
 
-            setBrightness(FAKE_ACCESSORY.arduinoIdentifier, value);
-
+            if (FAKE_ACCESSORY.isPoweredOn) {
+                console.log("Setting brightness to " + value + "%.");
+                setBrightness(FAKE_ACCESSORY.arduinoIdentifier, value);
+            }
             callback();
         });
 
@@ -247,10 +248,11 @@ function fakeLight(displayName, mac, arduinoIdentifier) {
 
 
 var accessories = [
-    fakeLight("alle",   "C0:A0:CA:54:F2:E0",    0),
-    fakeLight("Papa",   "C1:A1:CB:54:F2:E1",    1),
-    fakeLight("Mama",   "C2:A2:CC:54:F2:E2",    2),
-    fakeLight("Tisch",  "C3:A3:CD:54:F2:E3",    3)
+    fakeLight("alle",           "C0:A0:CA:54:F2:E0",    0),
+    fakeLight("Papa Fluter",    "C1:A1:CB:54:F2:E1",    1),
+    fakeLight("Papa Lesen",     "C2:A2:CC:54:F2:E2",    2),
+    //fakeLight("Mama",   "C2:A2:CC:54:F2:E2",    2),
+    //fakeLight("Tisch",  "C3:A3:CD:54:F2:E3",    3)
 ];
 
 module.exports = accessories;

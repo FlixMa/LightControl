@@ -4,7 +4,7 @@ import threading
 from time import sleep
 
 arduino = serial.Serial()
-arduino.port = "/dev/tty.usbmodem1411"
+arduino.port = "/dev/ttyACM0"
 arduino.baudrate = 115200
 arduino.bytesize = serial.EIGHTBITS
 arduino.parity = serial.PARITY_NONE
@@ -87,6 +87,7 @@ def listenForNode(stopEvent):
         try:
             nodejs, addr = server.accept()
             print("Client connected from", addr)
+            break
         except socket.timeout:
             pass
 
@@ -115,6 +116,7 @@ def fromNodeToArduino(stopEvent):
     while not stopEvent.is_set():
         jsonString = readFromNode()
         if jsonString is not None:
+            print("N <-", jsonString)
             writeToArduino(jsonString)
         else:
             listenForNode(stopEvent)
