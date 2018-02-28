@@ -163,7 +163,7 @@ void cLight::evaluate() {
 
         int calculatedBrightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
 
-        DEBUG_PRINT("brightness = "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
+        DEBUG_PRINT("brightness = "); /*DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
 
         DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(brightnessStroke); DEBUG_PRINT(" * "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
 
@@ -173,7 +173,7 @@ void cLight::evaluate() {
 
         DEBUG_PRINT("           = "); DEBUG_PRINT(this->lastBrightnessWhenIdling); DEBUG_PRINT(" + "); DEBUG_PRINT(deltaRising); DEBUG_PRINT(" - "); DEBUG_PRINTLN(deltaFalling);
 
-        DEBUG_PRINT("           = "); DEBUG_PRINTLN(calculatedBrightness);
+        DEBUG_PRINT("           = ");*/ DEBUG_PRINTLN(calculatedBrightness);
 
         setBrightness(calculatedBrightness);
     }
@@ -191,10 +191,10 @@ void cLight::manualControl() {
     // Debounce buttons.
     bool isDebouncing = (millis() - this->manuallyTriggeredTime) < TIME_DEBOUNCE_BUTTON;
 
-    // wenn steigende flanke und nicht noch am debouncen
+    // wenn steigende flanke und nicht mehr am debouncen
     // -> starte debounce und halte state auf HIGH
 
-    // wenn fallende flanke und nicht noch am debouncen
+    // wenn fallende flanke und nicht mehr am debouncen
     // -> starte debounce und halte state auf low
 
 
@@ -207,8 +207,16 @@ void cLight::manualControl() {
         this->manuallyTriggeredTime = millis();
         this->buttonWasPressed = true;
 
-        if (this->dimmingState == WAITING_FOR_COMMAND) {
-            startDimming();
+        switch (this->dimmingState) {
+            case WAITING_FOR_COMMAND:
+                startDimming();
+            break;
+
+            case POWERED_OFF:
+                turnOn();
+            break;
+            default:
+            break;
         }
 
 
@@ -222,8 +230,8 @@ void cLight::manualControl() {
         this->buttonWasPressed = false;
 
         switch (this->dimmingState) {
-            case POWERED_OFF:
-                turnOn();
+            case WAITING_FOR_COMMAND:
+                //We just turned on
             break;
 
             case WAITING_FOR_DIM_TO_START:
@@ -241,12 +249,16 @@ void cLight::manualControl() {
 }
 
 void cLight::setDimmingState(enum DimmingState newState, unsigned long timeChanged = 0) {
+
+    if (newState == WAITING_FOR_COMMAND && this->dimmingState != POWERED_OFF) {
+        // save brightness for next startup
+        DEBUG_PRINT("set lastBrightnessWhenIdling to "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
+        this->lastBrightnessWhenIdling = this->brightness;
+    }
+
     this->dimmingState = newState;
     this->lastStateChange = (timeChanged != 0) ? timeChanged : millis();
 
-    if (newState == WAITING_FOR_COMMAND) {
-        this->lastBrightnessWhenIdling = this->brightness;
-    }
 
     DEBUG_PRINT("setDimmingState -> ");
     DEBUG_PRINT(newState); DEBUG_PRINT(" | ");
@@ -324,6 +336,7 @@ void cLight::setBrightness(int value) {
     if (this->dimmingState == WAITING_FOR_COMMAND || (this->dimmingState == POWERED_OFF && this->brightness > 0)) {
 
         this->lastBrightnessWhenIdling = this->brightness;
+        DEBUG_PRINT("set lastBrightnessWhenIdling to "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
     }
 
     DEBUG_PRINT("set brightness to "); DEBUG_PRINTLN(this->brightness);
@@ -339,7 +352,7 @@ void cLight::applyBrightness() {
         // We have to adjust the output.
 
         // map value to the 8bit pwm duty cycle and write it out
-        int pwm = map(getBrightness(), 0, 100, 0, 255);
+        int pwm = map(target, 0, 100, 0, 255);
         analogWrite(this->outputPin, pwm);
         this->lastAppliedBrightness = target;
 

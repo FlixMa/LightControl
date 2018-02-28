@@ -24,14 +24,15 @@ void setup() {
 
     Serial.println("Arduino is ready!");
 
-    leselampe = new cLight(1, false, 9, 52);
+    leselampe = new cLight(2, true, 9, 52);
     leselampe->setBrightnessBounds(10, 100);
     //leselampe->debugMode = true;
-    
-    fluter = new cLight(2, false, 5, 50);
+
+    fluter = new cLight(1, true, 5, 50);
     fluter->setBrightnessBounds(10, 100);
     fluter->turnOn();
     fluter->setBrightness(50);
+    // fluter->debugMode = true;
 }
 
 /**
