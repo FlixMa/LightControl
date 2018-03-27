@@ -56,7 +56,11 @@ void cLight::evaluate() {
     //DEBUG_PRINTLN("\n###############");
     //DEBUG_PRINTLN("#    START    #\n");
 
-    if (isPoweredOn() && this->dimmingState != WAITING_FOR_COMMAND) {
+    if (
+        isPoweredOn()
+        && this->dimmingState != WAITING_FOR_COMMAND
+        && this->dimmingState != AUTOMATIC_MODE
+    ) {
         int brightnessStroke = (this->maximumBrightness - this->minimumBrightness);
 
         // 1. Look at the current dimming state
@@ -150,32 +154,42 @@ void cLight::evaluate() {
                 }
             }
             break;
-
+            case WAITING_FOR_AUTOMATIC_MODE:{
+                if (timeDelta >= TIME_WAITING_FOR_AUTOMATIC_MODE_AFTER_POWER_OFF) {
+                    // We've been waiting long enough for the user to enter automatic mode.
+                    // -> Enter POWERED_OFF.
+                    turnOff();
+                }
+            break;
             default: break;
         }
 
        DEBUG_PRINT("StateAfter: "); DEBUG_PRINTLN(this->dimmingState);
 
-        // 1.3. Calculate current brightness
+       // Do not overwrite brightness when prepapring to turn off.
+       if (this->dimmingState != WAITING_FOR_AUTOMATIC_MODE) {
 
-        int deltaRising = (this->dimmingState == DIM_RISING)  ? brightnessStroke * timeRisingFalling / TIME_DIM_RISING   : 0;
-        int deltaFalling = (this->dimmingState == DIM_FALLING)? brightnessStroke * timeRisingFalling / TIME_DIM_FALLING  : 0;
+            // 1.3. Calculate current brightness
 
-        int calculatedBrightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
+            int deltaRising = (this->dimmingState == DIM_RISING)  ? brightnessStroke * timeRisingFalling / TIME_DIM_RISING   : 0;
+            int deltaFalling = (this->dimmingState == DIM_FALLING)? brightnessStroke * timeRisingFalling / TIME_DIM_FALLING  : 0;
 
-        DEBUG_PRINT("brightness = "); /*DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
+            int calculatedBrightness = this->lastBrightnessWhenIdling + deltaRising - deltaFalling;
 
-        DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(brightnessStroke); DEBUG_PRINT(" * "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
+            DEBUG_PRINT("brightness = "); /*DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
 
-        DEBUG_PRINT("             - "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_FALLING); DEBUG_PRINT(" ? "); DEBUG_PRINT(brightnessStroke); DEBUG_PRINT(" * "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_FALLING); DEBUG_PRINTLN(" : 0");
+            DEBUG_PRINT("             + "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_RISING); DEBUG_PRINT(" ? "); DEBUG_PRINT(brightnessStroke); DEBUG_PRINT(" * "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_RISING); DEBUG_PRINTLN(" : 0");
 
-        DEBUG_PRINTLN("");
+            DEBUG_PRINT("             - "); DEBUG_PRINT(this->dimmingState); DEBUG_PRINT(" == "); DEBUG_PRINT(DIM_FALLING); DEBUG_PRINT(" ? "); DEBUG_PRINT(brightnessStroke); DEBUG_PRINT(" * "); DEBUG_PRINT(timeRisingFalling); DEBUG_PRINT(" / "); DEBUG_PRINT(TIME_DIM_FALLING); DEBUG_PRINTLN(" : 0");
 
-        DEBUG_PRINT("           = "); DEBUG_PRINT(this->lastBrightnessWhenIdling); DEBUG_PRINT(" + "); DEBUG_PRINT(deltaRising); DEBUG_PRINT(" - "); DEBUG_PRINTLN(deltaFalling);
+            DEBUG_PRINTLN("");
 
-        DEBUG_PRINT("           = ");*/ DEBUG_PRINTLN(calculatedBrightness);
+            DEBUG_PRINT("           = "); DEBUG_PRINT(this->lastBrightnessWhenIdling); DEBUG_PRINT(" + "); DEBUG_PRINT(deltaRising); DEBUG_PRINT(" - "); DEBUG_PRINTLN(deltaFalling);
 
-        setBrightness(calculatedBrightness);
+            DEBUG_PRINT("           = ");*/ DEBUG_PRINTLN(calculatedBrightness);
+
+            setBrightness(calculatedBrightness);
+        }
     }
 
     manualControl();
@@ -208,6 +222,15 @@ void cLight::manualControl() {
         this->buttonWasPressed = true;
 
         switch (this->dimmingState) {
+            case WAITING_FOR_AUTOMATIC_MODE:
+                // Enable automatic mode
+                enterAutomaticMode();
+            break;
+
+            case AUTOMATIC_MODE:
+                exitAutomaticMode();
+                //NOTE: This one is intended to fall trough!
+
             case WAITING_FOR_COMMAND:
                 startDimming();
             break;
@@ -215,6 +238,7 @@ void cLight::manualControl() {
             case POWERED_OFF:
                 turnOn();
             break;
+
             default:
             break;
         }
@@ -231,12 +255,19 @@ void cLight::manualControl() {
 
         switch (this->dimmingState) {
             case WAITING_FOR_COMMAND:
-                //We just turned on
+                // We just turned on
+            break;
+
+            case AUTOMATIC_MODE:
+                // We entered automatic mode (there is no
+                // other possibility to reach this case here).
+                //
+                // -> Leave all as it is.
             break;
 
             case WAITING_FOR_DIM_TO_START:
                 // If dimming hasn't started yet, just turn the light off.
-                turnOff();
+                prepareToTurnOff();
             break;
 
             default:
@@ -265,6 +296,9 @@ void cLight::setDimmingState(enum DimmingState newState, unsigned long timeChang
     DEBUG_PRINTLN(this->lastStateChange);
 }
 
+
+//MARK: - Power On / Off
+
 void cLight::turnOn() {
     DEBUG_PRINTLN("turning light on");
     if (!isPoweredOn()) {
@@ -282,13 +316,44 @@ void cLight::turnOn() {
     }
 }
 
-void cLight::turnOff() {
-    DEBUG_PRINTLN("turning light off");
+void cLight::prepareToTurnOff() {
     if (isPoweredOn()) {
+        DEBUG_PRINTLN("preparing to turn the light off");
+        setDimmingState(WAITING_FOR_AUTOMATIC_MODE);
+        setBrightness(0);
+    }
+}
+
+void cLight::turnOff() {
+    if (isPoweredOn()) {
+        DEBUG_PRINTLN("turning light off");
         setDimmingState(POWERED_OFF);
         setBrightness(0);
     }
 }
+
+
+//MARK: - Automatic Mode
+
+void cLight::enterAutomaticMode() {
+    if (!isInAutomaticMode()) {
+        turnOn();
+        setDimmingState(AUTOMATIC_MODE);
+    }
+}
+
+void cLight::exitAutomaticMode() {
+    if (isInAutomaticMode()) {
+        setDimmingState(WAITING_FOR_COMMAND);
+    }
+}
+
+bool cLight::isInAutomaticMode() {
+    return this->dimmingState == AUTOMATIC_MODE;
+}
+
+
+//MARK: - Dimming
 
 void cLight::startDimming() {
     // Check if dimming isn't already in progress.
@@ -308,7 +373,7 @@ void cLight::stopDimming() {
     switch (this->dimmingState) {
         case WAITING_FOR_DIM_TO_START:
             // When Button is released to early, the light will turn off.
-            turnOff();
+            prepareToTurnOff();
         break;
 
         case DIM_RISING: case WAITING_AT_PEAK: case DIM_FALLING: case WAITING_AT_LOW:
@@ -326,15 +391,16 @@ void cLight::stopDimming() {
     }
 }
 
-int cLight::readInput() {
-    return (this->manualTriggerPin != 0 && !digitalRead(this->manualTriggerPin)) ? HIGH : LOW;
-}
+
+//MARK: - Brightness Getter/Setter
 
 void cLight::setBrightness(int value) {
     this->brightness = constrain(value, 0, 100);
 
-    if (this->dimmingState == WAITING_FOR_COMMAND || (this->dimmingState == POWERED_OFF && this->brightness > 0)) {
-
+    if (
+        this->dimmingState == WAITING_FOR_COMMAND
+        || (this->dimmingState == POWERED_OFF && this->brightness > 0)
+    ) {
         this->lastBrightnessWhenIdling = this->brightness;
         DEBUG_PRINT("set lastBrightnessWhenIdling to "); DEBUG_PRINTLN(this->lastBrightnessWhenIdling);
     }
@@ -346,27 +412,43 @@ int cLight::getBrightness() {
     return isPoweredOn() ? this->brightness : 0;
 }
 
+void cLight::setBrightnessBounds(int minimum, int maximum) {
+    this->minimumBrightness = constrain(minimum, 0, 100);
+    this->maximumBrightness = constrain(maximum, 0, 100);
+}
+
+
+//MARK: - Input / Output
+
+int cLight::readInput() {
+    return (this->manualTriggerPin != 0 && !digitalRead(this->manualTriggerPin)) ? HIGH : LOW;
+}
+
 void cLight::applyBrightness() {
     int target = getBrightness();
     if (target != this->lastAppliedBrightness) {
         // We have to adjust the output.
 
+        int diff = abs(target - this->lastAppliedBrightness);
+
+        float smoothedTarget =
+                diff > 2 && target != 0
+            ?   (float) this->lastAppliedBrightness * (1.0f - this->smoothingFactor)
+                + (float) target * this->smoothingFactor
+            :   target;
+
         // map value to the 8bit pwm duty cycle and write it out
-        int pwm = map(target, 0, 100, 0, 255);
+        int pwm = (int) (smoothedTarget * 255.0f / 100.0f);
         analogWrite(this->outputPin, pwm);
-        this->lastAppliedBrightness = target;
+        this->lastAppliedBrightness = (int) smoothedTarget;
 
         // Let's notify the connected peer about the change.
         notifyPeer();
     }
 }
 
-void cLight::setBrightnessBounds(int minimum, int maximum) {
-    this->minimumBrightness = constrain(minimum, 0, 100);
-    this->maximumBrightness = constrain(maximum, 0, 100);
-}
 
-// JSON Analysis
+//MARK: - JSON Analysis
 
 void cLight::readJSON(String command) {
     char json[60];

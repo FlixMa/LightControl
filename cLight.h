@@ -12,9 +12,12 @@
 #define TIME_DIM_FALLING        (3000)
 #define TIME_WAITING_AT_LOW     (200)
 
+#define TIME_WAITING_FOR_AUTOMATIC_MODE_AFTER_POWER_OFF (500)
 
 enum DimmingState {
     POWERED_OFF,
+    WAITING_FOR_AUTOMATIC_MODE,
+    AUTOMATIC_MODE,
     WAITING_FOR_COMMAND,
     WAITING_FOR_DIM_TO_START,
     DIM_RISING,
@@ -58,6 +61,14 @@ public:
      * @return the dimming state
      */
     enum DimmingState getDimmingState();
+
+    /**
+     * Returns whether the light should be controlled
+     * by an external automatic source (e.g. a Brightness Sensor).
+     *
+     * @return is in automatic mode.
+     */
+    bool isInAutomaticMode();
 
     /**
      * Returns whether the lamp is turned on.
@@ -152,6 +163,10 @@ private:
      */
     int lastAppliedBrightness = -1;
 
+    /**
+     * The factor which is applied when setting the new brightness.
+     */
+    float smoothingFactor = 0.7;
 
     /**
      * The upper bound of brightness for this light. See setBrightnessBounds().
@@ -197,8 +212,20 @@ private:
     void startDimming();
     void stopDimming();
 
+
+    //MARK: - Input / Output
+
     int readInput();
     void applyBrightness();
+
+
+    //MARK: - Automatic Mode
+
+    void enterAutomaticMode();
+
+    void exitAutomaticMode();
+
+    void prepareToTurnOff();
 
     /**
      * Writes the current state of the light to the peer connected via Serial.
