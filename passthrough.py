@@ -73,9 +73,9 @@ nodeToArduino = None
 
 def connectToArduino(stopEvent):
     while not stopEvent.is_set() and not arduino.isOpen():
-	possibleDevices = map(lambda x: os.path.join("/dev/", x), filter(lambda x: "ttyACM" in x, os.listdir("/dev/")))
-	for devicePort in possibleDevices:
-	    arduino.port = devicePort
+        possibleDevices = map(lambda x: os.path.join("/dev/", x), filter(lambda x: "ttyACM" in x, os.listdir("/dev/")))
+        for devicePort in possibleDevices:
+            arduino.port = devicePort
             try:
                 arduino.open()
                 break
