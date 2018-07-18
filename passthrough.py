@@ -1,6 +1,7 @@
 import serial
 import socket
 import threading
+import os
 from time import sleep
 
 arduino = serial.Serial()
@@ -72,11 +73,14 @@ nodeToArduino = None
 
 def connectToArduino(stopEvent):
     while not stopEvent.is_set() and not arduino.isOpen():
-        try:
-            arduino.open()
-            break
-        except serial.SerialException:
-            sleep(0.2)
+	possibleDevices = map(lambda x: os.path.join("/dev/", x), filter(lambda x: "ttyACM" in x, os.listdir("/dev/")))
+	for devicePort in possibleDevices:
+	    arduino.port = devicePort
+            try:
+                arduino.open()
+                break
+            except serial.SerialException:
+                sleep(0.2)
     print("Successfully connected to Arduino:", readFromArduino())
 
 def listenForNode(stopEvent):
